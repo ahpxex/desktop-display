@@ -10,6 +10,11 @@ import AppKit
 
 struct ContentView: View {
     @ObservedObject var spaceObserver: SpaceObserver
+    @AppStorage("rainbowModeEnabled") private var rainbowModeEnabled = false
+
+    private var desktopColor: Color {
+        rainbowModeEnabled ? DesktopPalette.color(for: spaceObserver.currentDesktopIndex) : .primary
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -17,8 +22,11 @@ struct ContentView: View {
                 .font(.headline)
             Text("\(spaceObserver.currentDesktopIndex)")
                 .font(.system(size: 36, weight: .bold, design: .monospaced))
+                .foregroundColor(desktopColor)
 
             Divider()
+
+            Toggle("Rainbow Mode", isOn: $rainbowModeEnabled)
 
             Button("Refresh Now") {
                 spaceObserver.refresh()
