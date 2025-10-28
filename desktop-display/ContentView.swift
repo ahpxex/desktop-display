@@ -6,19 +6,34 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
+    @ObservedObject var spaceObserver: SpaceObserver
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Current Desktop")
+                .font(.headline)
+            Text("\(spaceObserver.currentDesktopIndex)")
+                .font(.system(size: 36, weight: .bold, design: .monospaced))
+
+            Divider()
+
+            Button("Refresh Now") {
+                spaceObserver.refresh()
+            }
+
+            Button("Quit Desktop Display") {
+                NSApp.terminate(nil)
+            }
+            .keyboardShortcut("q")
         }
-        .padding()
+        .padding(16)
+        .frame(minWidth: 200)
     }
 }
 
 #Preview {
-    ContentView()
+    ContentView(spaceObserver: SpaceObserver(initialSpaceIndex: 3, startMonitoring: false))
 }
