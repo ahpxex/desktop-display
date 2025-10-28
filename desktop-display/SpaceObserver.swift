@@ -152,7 +152,11 @@ final class SpaceObserver: ObservableObject {
         guard let index = SpaceDetector.currentSpaceIndex() else { return }
         if index != currentDesktopIndex {
             currentDesktopIndex = index
-            DesktopOverlayController.shared.present(desktopIndex: index)
+            if UserDefaults.standard.bool(forKey: "overlayEnabled") {
+                DesktopOverlayController.shared.present(desktopIndex: index)
+            } else {
+                DesktopOverlayController.shared.dismiss()
+            }
         }
     }
 }

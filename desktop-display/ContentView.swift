@@ -11,6 +11,7 @@ import AppKit
 struct ContentView: View {
     @ObservedObject var spaceObserver: SpaceObserver
     @AppStorage("rainbowModeEnabled") private var rainbowModeEnabled = false
+    @AppStorage("overlayEnabled") private var overlayEnabled = true
 
     private var desktopColor: Color {
         rainbowModeEnabled ? DesktopPalette.color(for: spaceObserver.currentDesktopIndex) : .primary
@@ -27,6 +28,7 @@ struct ContentView: View {
             Divider()
 
             Toggle("Rainbow Mode", isOn: $rainbowModeEnabled)
+            Toggle("Desktop Overlay", isOn: $overlayEnabled)
 
             Button("Refresh Now") {
                 spaceObserver.refresh()
@@ -39,6 +41,11 @@ struct ContentView: View {
         }
         .padding(16)
         .frame(minWidth: 200)
+        .onChange(of: overlayEnabled) { enabled in
+            if !enabled {
+                DesktopOverlayController.shared.dismiss()
+            }
+        }
     }
 }
 

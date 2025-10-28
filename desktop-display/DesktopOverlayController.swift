@@ -7,6 +7,12 @@
 
 import AppKit
 import SwiftUI
+import Combine
+
+fileprivate final class DesktopOverlayState: ObservableObject {
+    @Published var desktopIndex: Int = 1
+    @Published var accentColor: Color = .white
+}
 
 final class DesktopOverlayController {
     static let shared = DesktopOverlayController()
@@ -14,6 +20,8 @@ final class DesktopOverlayController {
     private var window: NSWindow?
     private var hostingController: NSHostingController<DesktopOverlayView>?
     private var dismissWorkItem: DispatchWorkItem?
+    private let state = DesktopOverlayState()
+    private var hideAnimationToken: UUID?
 
     private init() {}
 
@@ -23,16 +31,28 @@ final class DesktopOverlayController {
         }
     }
 
+    func dismiss() {
+        DispatchQueue.main.async {
+            self.dismissWorkItem?.cancel()
+            self.hideOverlay(immediate: true)
+        }
+    }
+
     private func showOverlay(desktopIndex: Int) {
         let rainbowEnabled = UserDefaults.standard.bool(forKey: "rainbowModeEnabled")
         let displayColor = rainbowEnabled ? DesktopPalette.color(for: desktopIndex) : .white
-        let overlayView = DesktopOverlayView(desktopIndex: desktopIndex, accentColor: displayColor)
-
         if hostingController == nil {
-            hostingController = NSHostingController(rootView: overlayView)
+            state.desktopIndex = desktopIndex
+            state.accentColor = displayColor
+            hostingController = NSHostingController(rootView: DesktopOverlayView(state: state))
         } else {
-            hostingController?.rootView = overlayView
+            withAnimation(.easeInOut(duration: 0.15)) {
+                state.desktopIndex = desktopIndex
+                state.accentColor = displayColor
+            }
         }
+
+        guard let hostingController else { return }
 
         guard let screen = NSScreen.main ?? NSScreen.screens.first else {
             return
@@ -65,12 +85,24 @@ final class DesktopOverlayController {
         guard let window else { return }
 
         dismissWorkItem?.cancel()
-        window.alphaValue = 0
-        window.orderFrontRegardless()
+        hideAnimationToken = nil
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            window.animator().alphaValue = 1
+        let isAlreadyVisible = window.isVisible && window.alphaValue > 0.01
+
+        if !isAlreadyVisible {
+            window.alphaValue = 0
+            window.orderFrontRegardless()
+
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                window.animator().alphaValue = 1
+            }
+        } else {
+            window.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.15
+                window.animator().alphaValue = 1
+            }
         }
 
         let workItem = DispatchWorkItem { [weak self] in
@@ -80,20 +112,31 @@ final class DesktopOverlayController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: workItem)
     }
 
-    private func hideOverlay() {
+    private func hideOverlay(immediate: Bool = false) {
         guard let window else { return }
+
+        if immediate {
+            hideAnimationToken = nil
+            window.alphaValue = 0
+            window.orderOut(nil)
+            return
+        }
+
+        let animationID = UUID()
+        hideAnimationToken = animationID
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.25
             window.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            self?.window?.orderOut(nil)
+            guard let self, self.hideAnimationToken == animationID else { return }
+            self.hideAnimationToken = nil
+            self.window?.orderOut(nil)
         })
     }
 }
 
 private struct DesktopOverlayView: View {
-    let desktopIndex: Int
-    let accentColor: Color
+    @ObservedObject var state: DesktopOverlayState
 
     var body: some View {
         ZStack {
@@ -104,9 +147,10 @@ private struct DesktopOverlayView: View {
                 Text("Desktop")
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(.white.opacity(0.85))
-                Text("\(desktopIndex)")
+                Text("\(state.desktopIndex)")
                     .font(.system(size: 88, weight: .heavy, design: .monospaced))
-                    .foregroundColor(accentColor)
+                    .foregroundColor(state.accentColor)
+                    .animation(.easeInOut(duration: 0.15), value: state.desktopIndex)
             }
             .padding(.horizontal, 48)
             .padding(.vertical, 36)
